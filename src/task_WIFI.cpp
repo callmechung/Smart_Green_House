@@ -8,6 +8,7 @@ void connect_wifi()
     WiFi.begin(WIFI_SSID, WIFI_PASS);
 
     uint32_t t = millis();
+    Serial.print("[WIFI] Connecting...");
     while (WiFi.status() != WL_CONNECTED && millis() - t < 5000)
     {
         Serial.print(".");
@@ -16,7 +17,7 @@ void connect_wifi()
 
     if (WiFi.status() != WL_CONNECTED)
     {
-        Serial.printf("WiFi connect time out after %d second. Retrying later.\n", 5);
+        Serial.printf("[WiFi] connect time out after %d second. Retrying later.\n", 5);
         isWifiConnected = false;
     }
 
