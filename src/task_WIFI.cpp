@@ -1,6 +1,6 @@
 #include "task_WIFI.h"
 
-static const char *WIFI_SSID = "CALLMECHUNG";
+static const char *WIFI_SSID = "Callmechung";
 static const char *WIFI_PASS = "28032005";
 
 void connect_wifi()

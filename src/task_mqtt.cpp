@@ -8,8 +8,19 @@ static const uint16_t mqtt_port = 1883;
 static const char *TOPIC_SENSOR = "greenframbku/sensors";
 static const char *TOPIC_CMD = "greenframbku/cmd";
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+WiFiClient      espClient;
+PubSubClient    client(espClient);
+
+// ========== SNAPSHOT: luôn giữ bản sao mới nhất để publish ==========
+// Được cập nhật mỗi khi sensor task ghi xong → publish NGAY lập tức
+static float snap_temp = 0.0;
+static float snap_humid = 0.0;
+static float snap_water = 0.0;
+static int snap_soil[NUM_SECTION] = {0};
+static int snap_light[NUM_SECTION] = {0};
+static bool snap_pump[NUM_SECTION] = {false};
+static int snap_led[NUM_SECTION] = {0};
+static bool new_data_ready = false; // flag: có data mới chưa publish
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
@@ -70,54 +81,27 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     else if (message.startsWith("LIGHT_1_SET_"))
     {
-        String string_light_val = message.substring(12);
-        int light_val = string_light_val.toInt();
-
-        if (light_val < 0)
-            light_val = 0;
-        if (light_val > 255)
-            light_val = 255;
-
-        Serial.printf("Section 1 - SET LED TO %d\n", light_val);
-
-        section[0].led_brightness = light_val;
-        section[0].is_light_on = (light_val != 0);
-
-        analogWrite(section[0].light_ctrl_pin, section[0].led_brightness);
+        int v = constrain(message.substring(12).toInt(), 0, 255);
+        section[0].led_brightness = v;
+        section[0].is_light_on = (v != 0);
+        analogWrite(section[0].light_ctrl_pin, v);
+        Serial.printf("Section 1 - LED SET %d\n", v);
     }
     else if (message.startsWith("LIGHT_2_SET_"))
     {
-        String string_light_val = message.substring(12);
-        int light_val = string_light_val.toInt();
-
-        if (light_val < 0)
-            light_val = 0;
-        if (light_val > 255)
-            light_val = 255;
-
-        Serial.printf("Section 2 - SET LED TO %d\n", light_val);
-
-        section[1].led_brightness = light_val;
-        section[1].is_light_on = (light_val != 0);
-
-        analogWrite(section[1].light_ctrl_pin, section[1].led_brightness);
+        int v = constrain(message.substring(12).toInt(), 0, 255);
+        section[1].led_brightness = v;
+        section[1].is_light_on = (v != 0);
+        analogWrite(section[1].light_ctrl_pin, v);
+        Serial.printf("Section 2 - LED SET %d\n", v);
     }
     else if (message.startsWith("LIGHT_3_SET_"))
     {
-        String string_light_val = message.substring(12);
-        int light_val = string_light_val.toInt();
-
-        if (light_val < 0)
-            light_val = 0;
-        if (light_val > 255)
-            light_val = 255;
-
-        Serial.printf("Section 3 - SET LED TO %d\n", light_val);
-
-        section[2].led_brightness = light_val;
-        section[2].is_light_on = (light_val != 0);
-
-        analogWrite(section[2].light_ctrl_pin, section[2].led_brightness);
+        int v = constrain(message.substring(12).toInt(), 0, 255);
+        section[2].led_brightness = v;
+        section[2].is_light_on = (v != 0);
+        analogWrite(section[2].light_ctrl_pin, v);
+        Serial.printf("Section 3 - LED SET %d\n", v);
     }
 }
 
@@ -143,15 +127,48 @@ void connect_mqtt()
         else
         {
             Serial.print(".");
-            Serial.println(client.state());
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
     }
 
     if (!client.connected())
     {
-        Serial.println("[MQTT] Connect timeout, retry later !!!");
+        Serial.println("[MQTT] Connect timeout - retry later !!!");
         isMqttConnected = false;
+    }
+}
+
+static void publish_snapshot()
+{
+    JsonDocument doc;
+
+    JsonObject air = doc["air"].to<JsonObject>();
+    air["t"] = snap_temp;
+    air["h"] = snap_humid;
+
+    doc["water_lvl"] = snap_water;
+
+    for (int i = 0; i < NUM_SECTION; i++)
+    {
+        String sec_name = "s" + String(i + 1);
+        JsonObject sec_obj = doc[sec_name].to<JsonObject>();
+        sec_obj["soil"] = snap_soil[i];
+        sec_obj["light"] = snap_light[i];
+        sec_obj["pump"] = snap_pump[i];
+        sec_obj["led"] = snap_led[i];
+    }
+
+    String payload;
+    serializeJson(doc, payload);
+
+    if (client.publish(TOPIC_SENSOR, payload.c_str()))
+    {
+        Serial.print("[MQTT] Published: ");
+        Serial.println(payload);
+    }
+    else
+    {
+        Serial.println("[MQTT] ❌ Publish FAILED");
     }
 }
 
@@ -161,86 +178,60 @@ void task_mqtt(void *pvParameter)
 
     connect_mqtt();
 
-    float cur_temp, cur_humid, cur_water_level;
-    int cur_soil_humid[NUM_SECTION], cur_light[NUM_SECTION], cur_led[NUM_SECTION];
-    bool cur_pump[NUM_SECTION];
+    static uint32_t last_publish_ms = 0;
+    const uint32_t PUBLISH_INTERVAL_MS = 10000; // publish each 10s
 
     while (1)
     {
         // ======== Step 1: Checking connection ========
-        if (!isWifiConnected || !isMqttConnected)
+        if (!isWifiConnected)
         {
-            if (isWifiConnected)
-            {
-                connect_mqtt();
-            }
-            vTaskDelay(pdMS_TO_TICKS(1000)); //Wait for stable
+            isMqttConnected = false;
+            vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
 
-        client.loop();
-
-        // ======== Step 2: Update value ========
-
-        if (isMqttConnected && xSensor != NULL &&
-            xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        if (!isMqttConnected || !client.connected())
         {
-            cur_temp = air_temp;
-            cur_humid = air_humid;
-            cur_water_level = water_level;
-
-            for (int i = 0; i < NUM_SECTION; i++)
-            {
-                cur_soil_humid[i] = section[i].soil_percent;
-                cur_light[i] = section[i].light_percent;
-                cur_pump[i] = section[i].is_pump_on;
-                cur_led[i] = section[i].led_brightness;
-            }
-
-            xSemaphoreGive(xSensor);
+            connect_mqtt();
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
         }
 
-        // ======== Step 3: Format Payload ========
-        static uint32_t last_publish_time = 0;
-        // Publish 10s 1 lan
-        if (isMqttConnected && (millis() - last_publish_time) > 10000)
+        
+        // ======== Step 2: Process incoming commands ========
+        client.loop();
+
+        // ======== Step 3: Publish data ========
+        uint32_t now = millis();
+        if (now - last_publish_ms >= PUBLISH_INTERVAL_MS)
         {
-            // Initialized a JSON document
-            JsonDocument doc;
-
-            // Preapare for payload
-            JsonObject air = doc["air"].to<JsonObject>();
-            air["t"] = cur_temp;
-            air["h"] = cur_humid;
-
-            doc["water_lvl"] = cur_water_level;
-
-            for (int i = 0; i < NUM_SECTION; i++)
+            // --- Take value ---
+            if (xSensor != NULL &&
+                xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
             {
-                // Section name: "s1", "s2", "s3"
-                String sec_name = "s" + String(i + 1);
+                snap_temp = air_temp;
+                snap_humid = air_humid;
+                snap_water = water_level;
 
-                // Tạo một Object con cho từng section
-                JsonObject sec_obj = doc[sec_name].to<JsonObject>();
+                for (int i = 0; i < NUM_SECTION; i++)
+                {
+                    snap_soil[i] = section[i].soil_percent;
+                    snap_light[i] = section[i].light_percent;
+                    snap_pump[i] = section[i].is_pump_on;
+                    snap_led[i] = section[i].led_brightness;
+                }
 
-                // Nhét data vào Object con đó
-                sec_obj["soil"] = cur_soil_humid[i];
-                sec_obj["light"] = cur_light[i];
-                sec_obj["pump"] = cur_pump[i];
-                sec_obj["led"] = cur_led[i];
+                xSemaphoreGive(xSensor);
+                new_data_ready = true;
             }
 
-            // Make Payload
-            String payload;
-            serializeJson(doc, payload);
-
-            // Publish to Broker
-            Serial.print("Publishing Payload: ");
-            Serial.println(payload);
-
-            client.publish(TOPIC_SENSOR, payload.c_str());
-
-            last_publish_time = millis();
+            if (new_data_ready)
+            {
+                publish_snapshot();
+                new_data_ready = false;
+                last_publish_ms = now;
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(50));

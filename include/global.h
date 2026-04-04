@@ -11,14 +11,14 @@
 
   SECTION-LEVEL (3 sections, same pattern repeated):
     Soil Sensor:
-      - ADC input: GPIO 36 (S1), 39 (S2), 34 (S3)
-      - Power output: GPIO 25 (S1), 26 (S2), 27 (S3)
+      - ADC input:          GPIO 36 (S1), 39 (S2), 34 (S3)
+      - Power output:       GPIO 25 (S1), 26 (S2), 27 (S3)
     Light Sensor:
-      - ADC input: GPIO 32 (S1), 33 (S2), 35 (S3)
+      - ADC input: GPIO:    GPIO 32 (S1), 33 (S2), 35 (S3)
     Pump Relay:
-      - Digital output: GPIO 5 (S1), 6 (S2), 7 (S3) 
+      - Digital output:     GPIO  5 (S1), 18 (S2), 19 (S3)
     LED Control:
-      - PWM output: GPIO 12 (S1), 13 (S2), 14 (S3) 
+      - PWM output:         GPIO 12 (S1), 13 (S2), 14 (S3)
 
   NODE-LEVEL:
     DHT22: GPIO 4 (Temperature/Humidity)
@@ -39,14 +39,14 @@
   TANK & SOIL CALIBRATION:
   Water tank level: 10 cm (assumed height from sensor to tank bottom)
   Soil moisture thresholds:
-    - Extremely Wet: 0-2000 (sensor saturated)
-    - Wet: 2000-3200 (adequate moisture)
-    - Dry: 3200-4095 (needs watering)
+    - Extremely Wet : 0-2000 (sensor saturated)
+    - Wet           : 2000-3200 (adequate moisture)
+    - Dry           : 3200-4095 (needs watering)
 */
 
-#define TANK_LEVEL 10.0
-#define X_WET 2000
-#define WET 3200
+#define TANK_LEVEL     10.0
+#define X_WET          2000
+#define WET            3200
 
 #define SOIL_DRY_VALUE 4095 
 #define SOIL_WET_VALUE 1500
@@ -70,7 +70,7 @@ struct GARDEN_SECTION
   int light_raw;
 
   int soil_percent;   // 0% = VERY DRY | 100% EXTREMELY WET
-  int light_percent; // 0% = DARK     | 100% = BRIGHT
+  int light_percent;  // 0% = DARK     | 100% = BRIGHT
 
   // Control states
   bool is_pump_on;

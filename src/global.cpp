@@ -1,10 +1,11 @@
 #include "global.h"
 
-GARDEN_SECTION section[NUM_SECTION] = 
+GARDEN_SECTION section[NUM_SECTION] =
 {
-    {1, 36, 25, 32, 5, 12, 0, 0, 0, 0, false, false, 0},
-    {2, 39, 26, 33, 6, 13, 0, 0, 0, 0, false, false, 0},
-    {3, 34, 27, 35, 7, 14, 0, 0, 0, 0, false, false, 0},
+    //  id  soil_sens  soil_pwr  light_in  pump_relay  led_pwm  raw  raw  %    %    pump   led    brightness
+    {1, 36, 25, 32, 5, 21, 0, 0, 0, 0, false, false, 0},  // S1 — LED: 12→21
+    {2, 39, 26, 33, 18, 13, 0, 0, 0, 0, false, false, 0}, // S2 — pump: 6→18
+    {3, 34, 27, 35, 19, 14, 0, 0, 0, 0, false, false, 0}, // S3 — pump: 7→19
 };
 
 float air_temp = 0.0;
@@ -13,7 +14,7 @@ float water_level = 0.0;
 
 bool pump_on = false;
 bool led_on = false;
-int led_pwm = 0;            
+int led_pwm = 0;
 
 SemaphoreHandle_t xSensor = NULL;
 bool isWifiConnected = false;
