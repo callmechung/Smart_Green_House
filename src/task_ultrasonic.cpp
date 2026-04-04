@@ -16,40 +16,25 @@ void task_ultrasonic(void *pvParemeter)
         //  ======== Step 2: Check validiation & Update ========
         if (isnan(cur_dis) || cur_dis < 0)
         {
-            Serial.printf("❌ ULTRASONIC SENSOR ERROR!!!\n");
-            Serial.printf("   Reading: %s (expected 0-%.1f cm)\n",
-                          isnan(cur_dis) ? "NaN" : String(cur_dis).c_str(),
-                          TANK_LEVEL);
+            Serial.println("[Ultrasonic] ❌ Sensor error");
+            vTaskDelay(pdMS_TO_TICKS(2000));
+            continue;
         }
-        else
+
+        new_level = TANK_LEVEL - cur_dis;
+        new_level = constrain(new_level, 0.0f, (float)TANK_LEVEL);
+
+        //  ======== Step 3: Update Global ========
+        if (xSensor != NULL &&
+            xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
         {
-            // Sensor OK
-            new_level = TANK_LEVEL - cur_dis;
-            // valid range = [0, TANK_LEVEL]
+            water_level = new_level;
+            xSemaphoreGive(xSensor); // ← trả mutex trước khi print
 
-            if (new_level < 0.0)
-            {
-                Serial.println("WARNING: WATER LEVEL NEGATIVE");
-                new_level = 0;
-            }
-            else if (new_level > TANK_LEVEL)
-            {
-                Serial.println("WARNING: WATER LEVEL OVER TANK LEVEL");
-                new_level = TANK_LEVEL;
-            }
-
-            Serial.printf("Ultrasonic OK | Distance: %.1f cm | Water Level: %.1f cm\n",
-                          cur_dis, new_level);
-
-            if (xSensor != NULL &&
-                xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
-            {
-                water_level = new_level;
-                xSemaphoreGive(xSensor);
-            }
         }
+        //  ======== Step 4: Log value ========
+        Serial.printf("[Ultrasonic] dist=%.1fcm  water=%.1fcm\n", cur_dis, new_level);
         
-
         vTaskDelay(pdMS_TO_TICKS(2000)); // 0.1s
     }
-}
+}    

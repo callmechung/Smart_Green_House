@@ -3,6 +3,7 @@
 void task_soil(void *pvParmeter)
 {
     int cur_analog_read[NUM_SECTION] = {0, 0, 0};
+    int cur_percent[NUM_SECTION] = {0, 0, 0};
 
     //  ======== Set up pins ========
     for (int i = 0; i < NUM_SECTION; i++)
@@ -30,83 +31,40 @@ void task_soil(void *pvParmeter)
             digitalWrite(section[i].soil_power_pin, LOW);
         }
 
-        // ======== Step 2: Update global values ========
+        // ======== Step 2: Calculate value ========
+        for (int i = 0; i < NUM_SECTION; i++)
+        {
+            if (cur_analog_read[i] >= SOIL_DRY_VALUE)
+                cur_percent[i] = 0;
+            else if (cur_analog_read[i] <= SOIL_WET_VALUE)
+                cur_percent[i] = 100;
+            else
+                cur_percent[i] = 100 - ((cur_analog_read[i] - SOIL_WET_VALUE) * 100) / (SOIL_DRY_VALUE - SOIL_WET_VALUE);
+        }
+
+        // ======== Step 3: Update global values ========
         if (xSensor != NULL &&
             xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
         {
             for (int i = 0; i < NUM_SECTION; i++)
             {
-                // Store raw ADC value;
                 section[i].soil_raw = cur_analog_read[i];
-
-                /*Calibaration
-                    SOIL_WET_VALUE (1500)  = 100% moisture (saturated)
-                    SOIL_DRY_VALUE (4095)  = 0% moisture (completely dry)
-                    Formula: percentage = (dry_reading - current_reading) / (dry_reading - wet_reading) * 100
-                */
-
-                int percent;
-                if (cur_analog_read[i] >= SOIL_DRY_VALUE)
-                {
-                    // Drier than calibration point - clamp to 0%
-                    percent = 0;
-                }
-                else if (cur_analog_read[i] <= SOIL_WET_VALUE)
-                {
-                    // Wetter than calibration point - clamp to 100%
-                    percent = 100;
-                }
-                else
-                {
-                    // Linear interpolation between calibration points
-                    percent = 100 - ((cur_analog_read[i] - SOIL_WET_VALUE) * 100) /
-                                        (SOIL_DRY_VALUE - SOIL_WET_VALUE);
-                }
-
-                section[i].soil_percent = percent;
+                section[i].soil_percent = cur_percent[i];
             }
 
-            // ======== Step 3: Log for debugging ========
-            for (int i = 0; i < NUM_SECTION; i++)
-            {
-                Serial.printf("Section %d: Soil Raw=%d, Moisture=%d%%  ",
-                              i + 1,
-                              cur_analog_read[i],
-                              section[i].soil_percent);
-
-                // Also print moisture category for quick assessment
-                if (cur_analog_read[i] <= X_WET)
-                {
-                    Serial.println("Status: EXTREMELY WET");
-                }
-                else if (cur_analog_read[i] <= WET)
-                {
-                    Serial.println("Status: WET");
-                }
-                else
-                {
-                    Serial.println("Status: DRY");
-                }
-            }
             xSemaphoreGive(xSensor);
         }
 
+        // ======== Step 4: Update global values ========
         for (int i = 0; i < NUM_SECTION; i++)
         {
-            if (cur_analog_read[i] <= X_WET)
-            {
-                Serial.printf("Section %d is EXTREMELY WET!!!\n", i + 1);
-            }
-            else if (cur_analog_read[i] <= WET)
-            {
-                Serial.printf("Section %d is WET!!!\n", i + 1);
-            }
-            else
-            {
-                Serial.printf("Section %d is DRY!!!\n", i + 1);
-            }
+            const char *status = (cur_analog_read[i] <= X_WET) ? "X-WET"
+                                 : (cur_analog_read[i] <= WET) ? "WET"
+                                                               : "DRY";
+            Serial.printf("[Soil] S%d: raw=%d  moisture=%d%%  [%s]\n",
+                          i + 1, cur_analog_read[i], cur_percent[i], status);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10000)); // 10s
+        vTaskDelay(pdMS_TO_TICKS(2000)); // 2s
     }
 }

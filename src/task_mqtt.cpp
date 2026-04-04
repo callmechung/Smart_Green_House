@@ -20,13 +20,9 @@ static int snap_soil[NUM_SECTION] = {0};
 static int snap_light[NUM_SECTION] = {0};
 static bool snap_pump[NUM_SECTION] = {false};
 static int snap_led[NUM_SECTION] = {0};
-static bool new_data_ready = false; // flag: có data mới chưa publish
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
-    Serial.print("New message: ");
-    Serial.println(topic);
-
     // 1) Get message
     String message = "";
     for (unsigned int i = 0; i < length; i++)
@@ -34,8 +30,7 @@ void callback(char *topic, byte *payload, unsigned int length)
         message += (char)payload[i];
     }
 
-    Serial.print("The message is: ");
-    Serial.println(message);
+    Serial.printf("[MQTT] CMD: %s\n", message.c_str());
 
     // 2) Do the task
 
@@ -123,6 +118,7 @@ void connect_mqtt()
 
             // Subcrising after connected
             client.subscribe(TOPIC_CMD);
+            return;
         }
         else
         {
@@ -176,6 +172,10 @@ void task_mqtt(void *pvParameter)
 {
     // ======== Set up server and Initialize variables ========
 
+    Serial.println("[MQTT] Waiting for WiFi...");
+    while (!isWifiConnected)
+        vTaskDelay(pdMS_TO_TICKS(500));
+
     connect_mqtt();
 
     static uint32_t last_publish_ms = 0;
@@ -223,15 +223,10 @@ void task_mqtt(void *pvParameter)
                 }
 
                 xSemaphoreGive(xSensor);
-                new_data_ready = true;
-            }
+           }
 
-            if (new_data_ready)
-            {
-                publish_snapshot();
-                new_data_ready = false;
-                last_publish_ms = now;
-            }
+           publish_snapshot();
+           last_publish_ms = now;
         }
 
         vTaskDelay(pdMS_TO_TICKS(50));

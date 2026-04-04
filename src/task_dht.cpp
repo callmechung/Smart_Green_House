@@ -19,19 +19,10 @@ void task_dht(void *pvParameter)
         //  ======== Step 2: Check validiation & Update ========
         if (isnan(cur_h) || isnan(cur_t))
         {
-            Serial.println("❌ DHT22 is DISCONNECTED or FAILED!!!");
-            Serial.printf("   Humidity read: %s, Temperature read: %s\n",
-                          isnan(cur_h) ? "NaN" : "OK",
-                          isnan(cur_t) ? "NaN" : "OK");
-
-            // sensor_valid = false;
+            Serial.println("[DHT] ❌ Sensor error (NaN)");
         }
         else
         {
-            // Sensor OK
-            Serial.printf("DHT22 OK | Temperature: %.1f °C | Humidity: %.1f %%\n",
-                          cur_t, cur_h);
-
             // Update global variables with valid data
             if (xSensor != NULL &&
                 xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
@@ -39,8 +30,11 @@ void task_dht(void *pvParameter)
                 air_temp = cur_t;
                 air_humid = cur_h;
                 xSemaphoreGive(xSensor);
-            }            
+            }       
+            // Log value
+            Serial.printf("[DHT] Temp: %.1f°C  Humid: %.1f%%\n", cur_t, cur_h);
         }
+        
 
         vTaskDelay(pdMS_TO_TICKS(2000)); // Read only 2sec
     }
