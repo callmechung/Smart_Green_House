@@ -9,8 +9,6 @@ void task_soil(void *pvParmeter)
     for (int i = 0; i < NUM_SECTION; i++)
     {
         pinMode(section[i].soil_sensor_pin, INPUT);     // ADC input
-        pinMode(section[i].soil_power_pin, OUTPUT);     // Power control
-        digitalWrite(section[i].soil_power_pin, LOW);   // Keep OFF
     }
 
     while (1)
@@ -18,17 +16,8 @@ void task_soil(void *pvParmeter)
         // ======== Step 1: Read all ADC value of soil moister sensor ========
         for (int i = 0; i < NUM_SECTION; i++)
         {
-            // Enable sensor
-            digitalWrite(section[i].soil_power_pin, HIGH);
-
-            // wait for stable
-            vTaskDelay(pdMS_TO_TICKS(50));  
-
             // Read 12-bit ADC value (0-4095)
             cur_analog_read[i] = analogRead(section[i].soil_sensor_pin);
-            
-            // Diasble sensor
-            digitalWrite(section[i].soil_power_pin, LOW);
         }
 
         // ======== Step 2: Calculate value ========

@@ -12,7 +12,7 @@
   SECTION-LEVEL (3 sections, same pattern repeated):
     Soil Sensor:
       - ADC input:          GPIO 36 (S1), 39 (S2), 34 (S3)
-      - Power output:       GPIO 25 (S1), 26 (S2), 27 (S3)
+      - Power output:       GPIO 25 (S1), 26 (S2), 27 (S3) => BỎ THAY LÀM FAN CONTROL => FIX LATER
     Light Sensor:
       - ADC input: GPIO:    GPIO 32 (S1), 33 (S2), 35 (S3)
     Pump Relay:
@@ -58,7 +58,6 @@ struct GARDEN_SECTION
 
   // INPUT PINs
   int soil_sensor_pin;
-  int soil_power_pin;
   int light_pin;
 
   // OUTPUT PINs
