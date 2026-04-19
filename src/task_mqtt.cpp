@@ -18,9 +18,9 @@ static float snap_humid = 0.0;
 static float snap_water = 0.0;
 static int snap_soil[NUM_SECTION] = {0};
 static int snap_light[NUM_SECTION] = {0};
-static bool snap_pump[NUM_SECTION] = {false};
+static int snap_pump[NUM_SECTION] = {false};
 static int snap_led[NUM_SECTION] = {0};
-
+static int snap_fan[NUM_SECTION] = {0};
 void callback(char *topic, byte *payload, unsigned int length)
 {
     // 1) Get message
@@ -34,69 +34,325 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     // 2) Do the task
 
+    // ======= THRESHOLD COMMANDs ========
+    // --- SECTION 1 ---
+    if (message.startsWith("DRY_1_SET_"))
+    {
+        int v = constrain(message.substring(10).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].soil_dry_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 1 - SET DRY THRESHOLD TO: %d%%\n", v);
+    }
+    else if (message.startsWith("WET_1_SET_"))
+    {
+        int v = constrain(message.substring(10).toInt(), section[0].soil_dry_threshold + 1, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].soil_wet_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 1 - SET WET THRESHOLD TO: %d%%\n", v);
+    }
+    // --- SECTION 2 ---
+    else if (message.startsWith("DRY_2_SET_"))
+    {
+        int v = constrain(message.substring(10).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].soil_dry_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 2 - SET DRY THRESHOLD TO: %d%%\n", v);
+    }
+    else if (message.startsWith("WET_2_SET_"))
+    {
+        int v = constrain(message.substring(10).toInt(), section[1].soil_dry_threshold + 1, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].soil_wet_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 2 - SET WET THRESHOLD TO: %d%%\n", v);
+    }
+    // --- SECTION 3 ---
+    else if (message.startsWith("DRY_3_SET_"))
+    {
+        int v = constrain(message.substring(10).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].soil_dry_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 3 - SET DRY THRESHOLD TO: %d%%\n", v);
+    }
+    else if (message.startsWith("WET_3_SET_"))
+    {
+        int v = constrain(message.substring(10).toInt(), section[2].soil_dry_threshold + 1, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].soil_wet_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 3 - SET WET THRESHOLD TO: %d%%\n", v);
+    }
+
     // ======== PUMP COMMANDs ========
-    if (message == "PUMP_1_ON")
+    // --- SECTION 1 ---
+    else if (message == "PUMP_1_ON")
     {
-        Serial.println("Section 1 - PUMP ON");
-        section[0].is_pump_on = true;
-        digitalWrite(section[0].pump_relay_pin, HIGH);
-    }
-    else if (message == "PUMP_2_ON")
-    {
-        Serial.println("Section 2 - PUMP ON");
-        section[1].is_pump_on = true;
-        digitalWrite(section[1].pump_relay_pin, HIGH);
-    }
-    else if (message == "PUMP_3_ON")
-    {
-        Serial.println("Section 3 - PUMP ON");
-        section[2].is_pump_on = true;
-        digitalWrite(section[2].pump_relay_pin, HIGH);
+        Serial.println("Section 1 - PUMP ON (Manual)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].is_auto_pump = false;
+            section[0].is_pump_on = true;
+            xSemaphoreGive(xSensor);
+        }
     }
     else if (message == "PUMP_1_OFF")
     {
-        Serial.println("Section 1 - PUMP OFF");
-        section[0].is_pump_on = false;
-        digitalWrite(section[0].pump_relay_pin, LOW);
+        Serial.println("Section 1 - PUMP OFF (Manual)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].is_auto_pump = false;
+            section[0].is_pump_on = false;
+            xSemaphoreGive(xSensor);
+        }
+    }
+    else if (message == "PUMP_1_AUTO")
+    {
+        Serial.println("Section 1 - PUMP (Auto Mode)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].is_auto_pump = true;
+            xSemaphoreGive(xSensor);
+        }
+    }
+    // --- SECTION 2 ---
+    else if (message == "PUMP_2_ON")
+    {
+        Serial.println("Section 2 - PUMP ON (Manual)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].is_auto_pump = false;
+            section[1].is_pump_on = true;
+            xSemaphoreGive(xSensor);
+        }
     }
     else if (message == "PUMP_2_OFF")
     {
-        Serial.println("Section 2 - PUMP OFF");
-        section[1].is_pump_on = false;
-        digitalWrite(section[1].pump_relay_pin, LOW);
+        Serial.println("Section 2 - PUMP OFF (Manual)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].is_auto_pump = false;
+            section[1].is_pump_on = false;
+            xSemaphoreGive(xSensor);
+        }
+    }
+    else if (message == "PUMP_2_AUTO")
+    {
+        Serial.println("Section 2 - PUMP (Auto Mode)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].is_auto_pump = true;
+            xSemaphoreGive(xSensor);
+        }
+    }
+    // --- SECTION 3 ---
+    else if (message == "PUMP_3_ON")
+    {
+        Serial.println("Section 3 - PUMP ON (Manual)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].is_auto_pump = false;
+            section[2].is_pump_on = true;
+            xSemaphoreGive(xSensor);
+        }
     }
     else if (message == "PUMP_3_OFF")
     {
-        Serial.println("Section 3 - PUMP OFF");
-        section[2].is_pump_on = false;
-        digitalWrite(section[2].pump_relay_pin, LOW);
+        Serial.println("Section 3 - PUMP OFF (Manual)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].is_auto_pump = false;
+            section[2].is_pump_on = false;
+            xSemaphoreGive(xSensor);
+        }
+    }
+    else if (message == "PUMP_3_AUTO")
+    {
+        Serial.println("Section 3 - PUMP (Auto Mode)");
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].is_auto_pump = true;
+            xSemaphoreGive(xSensor);
+        }
     }
 
     // ======== LIGHT COMMANDs ========
-
+    // --- SECTION 1 ---
     else if (message.startsWith("LIGHT_1_SET_"))
     {
-        int v = constrain(message.substring(12).toInt(), 0, 255);
-        section[0].led_brightness = v;
-        section[0].is_light_on = (v != 0);
-        analogWrite(section[0].light_ctrl_pin, v);
-        Serial.printf("Section 1 - LED SET %d\n", v);
+        int percent = constrain(message.substring(12).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].is_auto_light = false;
+            section[0].led_brightness = percent; // Lưu trữ bằng %
+            section[0].is_light_on = (percent > 0);
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 1 - LED SET MANUAL TO %d%%\n", percent);
     }
+    else if (message == "LIGHT_1_AUTO")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].is_auto_light = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 1 - LED AUTO MODE");
+    }
+
+    // --- SECTION 2 ---
     else if (message.startsWith("LIGHT_2_SET_"))
     {
-        int v = constrain(message.substring(12).toInt(), 0, 255);
-        section[1].led_brightness = v;
-        section[1].is_light_on = (v != 0);
-        analogWrite(section[1].light_ctrl_pin, v);
-        Serial.printf("Section 2 - LED SET %d\n", v);
+        int percent = constrain(message.substring(12).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].is_auto_light = false;
+            section[1].led_brightness = percent;
+            section[1].is_light_on = (percent > 0);
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 2 - LED SET MANUAL TO %d%%\n", percent);
     }
+    else if (message == "LIGHT_2_AUTO")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].is_auto_light = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 2 - LED AUTO MODE");
+    }
+
+    // --- SECTION 3 ---
     else if (message.startsWith("LIGHT_3_SET_"))
     {
-        int v = constrain(message.substring(12).toInt(), 0, 255);
-        section[2].led_brightness = v;
-        section[2].is_light_on = (v != 0);
-        analogWrite(section[2].light_ctrl_pin, v);
-        Serial.printf("Section 3 - LED SET %d\n", v);
+        int percent = constrain(message.substring(12).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].is_auto_light = false;
+            section[2].led_brightness = percent;
+            section[2].is_light_on = (percent > 0);
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 3 - LED SET MANUAL TO %d%%\n", percent);
+    }
+    else if (message == "LIGHT_3_AUTO")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].is_auto_light = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 3 - LED AUTO MODE");
+    }
+
+    // ======== FAN COMMANDs ========
+    // --- SECTION 1 ---
+    else if (message == "FAN_1_ON")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].is_auto_fan = false;
+            section[0].is_fan_on = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 1 - FAN ON (Manual)");
+    }
+    else if (message == "FAN_1_OFF")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].is_auto_fan = false;
+            section[0].is_fan_on = false;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 1 - FAN OFF (Manual)");
+    }
+    else if (message == "FAN_1_AUTO")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].is_auto_fan = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 1 - FAN AUTO MODE");
+    }
+
+    // --- SECTION 2 ---
+    else if (message == "FAN_2_ON")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].is_auto_fan = false;
+            section[1].is_fan_on = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 2 - FAN ON (Manual)");
+    }
+    else if (message == "FAN_2_OFF")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].is_auto_fan = false;
+            section[1].is_fan_on = false;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 2 - FAN OFF (Manual)");
+    }
+    else if (message == "FAN_2_AUTO")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].is_auto_fan = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 2 - FAN AUTO MODE");
+    }
+
+    // --- SECTION 3 ---
+    else if (message == "FAN_3_ON")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].is_auto_fan = false;
+            section[2].is_fan_on = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 3 - FAN ON (Manual)");
+    }
+    else if (message == "FAN_3_OFF")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].is_auto_fan = false;
+            section[2].is_fan_on = false;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 3 - FAN OFF (Manual)");
+    }
+    else if (message == "FAN_3_AUTO")
+    {
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].is_auto_fan = true;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.println("Section 3 - FAN AUTO MODE");
     }
 }
 
@@ -152,6 +408,7 @@ static void publish_snapshot()
         sec_obj["light"] = snap_light[i];
         sec_obj["pump"] = snap_pump[i];
         sec_obj["led"] = snap_led[i];
+        sec_obj["fan"] = snap_fan[i];
     }
 
     String payload;
@@ -218,8 +475,9 @@ void task_mqtt(void *pvParameter)
                 {
                     snap_soil[i] = section[i].soil_percent;
                     snap_light[i] = section[i].light_percent;
-                    snap_pump[i] = section[i].is_pump_on;
+                    snap_pump[i] = section[i].is_pump_on ? 1 : 0;
                     snap_led[i] = section[i].led_brightness;
+                    snap_fan[i] = section[i].is_fan_on ? 1 : 0;
                 }
 
                 xSemaphoreGive(xSensor);

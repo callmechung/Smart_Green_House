@@ -53,16 +53,15 @@
 
 struct GARDEN_SECTION
 {
-  // Identifers
+  // Identifers & INPUT PINs
   int id;
-
-  // INPUT PINs
   int soil_sensor_pin;
   int light_pin;
 
   // OUTPUT PINs
   int pump_relay_pin;
   int light_ctrl_pin;
+  int fan_relay_pin;
 
   // Sensor raw data - 12 bits ADC
   int soil_raw;     
@@ -75,6 +74,18 @@ struct GARDEN_SECTION
   bool is_pump_on;
   bool is_light_on;
   int led_brightness;
+  bool is_fan_on;
+
+  // Flag mode
+  bool is_auto_pump;
+  bool is_auto_light;
+  bool is_auto_fan;
+
+  // Threshold
+  int soil_wet_threshold;   // after conver to percent
+  int soil_dry_threshold;   // after conver to percent
+  int light_threshold;
+  float temp_threshold;
 };
 
 // ========== GLOBAL STATE VARIABLES ==========

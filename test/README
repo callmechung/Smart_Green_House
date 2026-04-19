@@ -1,11 +1,126 @@
 
-This directory is intended for PlatformIO Test Runner and project tests.
+# 🌱 Green Farm BKU - Smart Agriculture IoT Firmware
 
-Unit Testing is a software testing method by which individual units of
-source code, sets of one or more MCU program modules together with associated
-control data, usage procedures, and operating procedures, are tested to
-determine whether they are fit for use. Unit testing finds problems early
-in the development cycle.
+![ESP32] ![FreeRTOS] ![MQTT] ![C++]
 
-More information about PlatformIO Unit Testing:
-- https://docs.platformio.org/en/latest/advanced/unit-testing/index.html
+---
+
+## 🌟 1. Tính năng cốt lõi (Core Features)
+
+- ⏱️ **FreeRTOS Architecture:** Quản lý đa tác vụ song song (đọc cảm biến, xử lý mạng, điều khiển thiết bị) an toàn với cơ chế `Mutex`, chống deadlock.
+- 🌍 **Giám sát môi trường toàn diện:**
+  - Nhiệt độ & Độ ẩm không khí (DHT22).
+  - Mực nước trong bồn chứa (Ultrasonic HC-SR04).
+  - Độ ẩm đất & Cường độ ánh sáng (Phân lập theo 3 khu vực - Sections).
+- ⚙️ **Dual-Mode Control (Tự động & Thủ công):**
+  - **Auto Mode:** Tự động điều khiển Bơm, Quạt, Đèn dựa trên Ngưỡng (Threshold) môi trường. Có tích hợp Hysteresis (bù trừ nhiễu) bảo vệ tuổi thọ thiết bị phần cứng.
+  - **Manual Mode:** Người dùng can thiệp trực tiếp trạng thái thiết bị theo thời gian thực.
+- 🎛️ **Dynamic Configuration:** Cho phép cập nhật thông số ngưỡng đất (DRY/WET) trực tiếp từ Web.
+
+---
+
+## 🔌 2. Sơ đồ phần cứng (Hardware Pinout)
+
+Hệ thống được chia làm 2 cấp độ: **Dùng chung toàn vườn (Node-Level)** và **Độc lập theo khu vực (Section-Level)**.
+
+### 📍 Node-Level (Dùng chung)
+| Thiết bị / Module | Loại tín hiệu | Chân GPIO              | Vai trò |
+| :---              | :--- | :---:  | :---                  
+| **DHT22**         | Digital In    | `4`                    | Đo nhiệt độ & Độ ẩm không khí |
+| **HC-SR04**       | Digital I/O   | Trig: `16` / Echo: `17`| Cảm biến siêu âm đo mực nước  |
+
+### 📍 Section-Level (3 Khu vực độc lập)
+| Tên tín hiệu | Loại tín hiệu | Section 1 | Section 2 | Section 3 |
+| :--- | :--- | :---: | :---: | :---: |
+| **Độ ẩm đất (Soil)** | Analog In (ADC) | `36` | `39` | `34` |
+| **Ánh sáng (Light)** | Analog In (ADC) | `32` | `33` | `35` |
+| **Máy bơm (Pump)** | Digital Out (Relay) | `5` | `18` | `19` |
+| **Quạt (Fan)** | Digital Out (Relay) | `25` | `26` | `27` |
+| **Đèn LED** | PWM Out | `21` | `13` | `14` |
+
+---
+
+## 📡 3. Giao thức MQTT (Communication Protocol)
+
+Hệ thống giao tiếp hai chiều theo thời gian thực thông qua MQTT Broker.
+
+> **Thông tin kết nối Broker:**
+> - **Host:** `broker.hivemq.com`
+> - **Port (Mạch ESP32):** `1883` (TCP)
+> - **Port (Web Frontend):** `8000` (WebSockets - đường dẫn `/mqtt`)
+
+### 📤 3.1. Telemetry (ESP32 ➔ Web)
+Gửi dữ liệu môi trường và trạng thái thiết bị lên Dashboard.
+- **Topic:** `greenframbku/sensors`
+- **Tần suất gửi:** Mỗi 10 giây / lần
+- **Định dạng:** JSON
+
+**Ví dụ Payload:**
+```json
+{
+  "air": {
+    "t": 32.5,
+    "h": 75.0
+  },
+  "water_lvl": 8.5,
+  "s1": {
+    "soil": 45,
+    "light": 60,
+    "pump": 1,
+    "led": 80,
+    "fan": 0
+  },
+  "s2": {
+    "soil": 30,
+    "light": 70,
+    "pump": 0,
+    "led": 0,
+    "fan": 1
+  },
+  "s3": {
+    "soil": 55,
+    "light": 50,
+    "pump": 0,
+    "led": 100,
+    "fan": 0
+  }
+}
+```
+
+**Từ điển dữ liệu (Data Dictionary):**
+- `air.t` & `air.h`: Nhiệt độ (°C) và Độ ẩm không khí (%) - *(Float)*.
+- `water_lvl`: Mực nước còn lại trong bồn (cm) - *(Float, Max = 10.0)*.
+- `s1, s2, s3`: Dữ liệu độc lập của 3 khu vực canh tác.
+- `soil` & `light`: Độ ẩm đất và Ánh sáng (%) - *(Integer: 0 - 100)*.
+- `pump` & `fan`: Trạng thái Máy bơm, Quạt - *(Integer: 1 = ON, 0 = OFF)*.
+- `led`: Độ sáng đèn chiếu sáng (%) - *(Integer: 0 = OFF, 1-100 = Độ sáng)*.
+
+---
+
+### 📥 3.2. Commands (Web ➔ ESP32)
+Nhận lệnh điều khiển thủ công và cấu hình từ Web.
+- **Topic:** `greenframbku/cmd`
+- **Định dạng:** Plain Text String (Chuỗi văn bản thuần)
+
+> ⚠️ **Lưu ý Quan trọng:** > Khi Web gửi lệnh thủ công (ON/OFF/SET), thiết bị tại khu vực đó sẽ **ngay lập tức thoát khỏi chế độ Tự Động (Auto)**. Để mạch tự chạy lại, Web bắt buộc phải gửi lệnh `<DEVICE>_AUTO`.
+
+#### 🌡️ A. Cấu hình Ngưỡng (Thresholds)
+*Nguyên tắc Logic: Giá trị `WET` phải luôn lớn hơn `DRY`.*
+- **Ngưỡng Đất Khô (DRY - Bật bơm):** `DRY_1_SET_40` *(Cho Section 1)*
+- **Ngưỡng Đất Ướt (WET - Tắt bơm):** `WET_1_SET_70` *(Cho Section 1)*
+*(Thay số `1` thành `2` hoặc `3` cho các khu vực tương ứng).*
+
+#### 💧 B. Điều khiển Máy Bơm (Pump)
+- **Manual ON/OFF:** `PUMP_1_ON` | `PUMP_1_OFF`
+- **Kích hoạt Auto:** `PUMP_1_AUTO` *(Tự bơm khi đất khô, tự ngắt khi đất ướt)*.
+
+#### 🌬️ C. Điều khiển Quạt (Fan)
+- **Manual ON/OFF:** `FAN_1_ON` | `FAN_1_OFF`
+- **Kích hoạt Auto:** `FAN_1_AUTO` *(Tự bật khi nhiệt độ môi trường tăng cao)*.
+
+#### 💡 D. Điều khiển Đèn LED (Dimming 0% - 100%)
+- **Cài đặt độ sáng:** `LIGHT_1_SET_X` *(Với X là % từ 0 đến 100)*.
+  - *Ví dụ Tắt đèn:* `LIGHT_1_SET_0`
+  - *Ví dụ Sáng 50%: * `LIGHT_1_SET_50`
+- **Kích hoạt Auto:** `LIGHT_1_AUTO` *(Tự sáng MAX khi trời tối, tự tắt khi trời sáng)*.
+```

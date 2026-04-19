@@ -1,11 +1,39 @@
 #include "global.h"
 
 GARDEN_SECTION section[NUM_SECTION] =
-{
-    //  id  soil_sens  light_in  pump_relay  led_pwm  raw  raw  %    %    pump   led    brightness
-    {1, 36, 32, 5, 21, 0, 0, 0, 0, false, false, 0},  // S1 — LED: 12→21
-    {2, 39, 33, 18, 13, 0, 0, 0, 0, false, false, 0}, // S2 — pump: 6→18
-    {3, 34, 35, 19, 14, 0, 0, 0, 0, false, false, 0}, // S3 — pump: 7→19
+    {
+        // Section 1
+        {
+            1,                      // Identifer
+            36, 32,                 // Input pins
+            5, 21, 25,              // Output pins
+            0, 0, 0, 0,             // Sensors raw data - 12 bit & percentage conversion
+            false, false, 0, false, // Control states
+            true, true, true,       // Flag mode
+            70, 40, 40, 36.7        // Threshold
+        },
+
+        // Section 2
+        {
+            2,                      // Identifer
+            39, 33,                 // Input pins
+            18, 13, 26,             // Output pins
+            0, 0, 0, 0,             // Sensors raw data - 12 bit & percentage conversion
+            false, false, 0, false, // Control states
+            true, true, true,       // Flag mode
+            70, 40, 40, 36.7        // Threshold
+        },
+
+        // Section 3
+        {
+            3,                      // Identifer
+            34, 35,                 // Input pins
+            19, 14, 27,             // Output pins
+            0, 0, 0, 0,             // Sensors raw data - 12 bit & percentage conversion
+            false, false, 0, false, // Control states
+            true, true, true,       // Flag mode
+            70, 40, 40, 36.7        // Threshold
+        },
 };
 
 float air_temp = 0.0;
