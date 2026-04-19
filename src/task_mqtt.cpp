@@ -99,6 +99,70 @@ void callback(char *topic, byte *payload, unsigned int length)
         Serial.printf("Section 3 - SET WET THRESHOLD TO: %d%%\n", v);
     }
 
+    // --- LIGHT THRESHOLD ---
+    else if (message.startsWith("LIGHT_1_TH_SET_"))
+    {
+        int v = constrain(message.substring(15).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].light_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 1 - SET LIGHT THRESHOLD TO: %d%%\n", v);
+    }
+    else if (message.startsWith("LIGHT_2_TH_SET_"))
+    {
+        int v = constrain(message.substring(15).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].light_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 2 - SET LIGHT THRESHOLD TO: %d%%\n", v);
+    }
+    else if (message.startsWith("LIGHT_3_TH_SET_"))
+    {
+        int v = constrain(message.substring(15).toInt(), 0, 100);
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].light_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 3 - SET LIGHT THRESHOLD TO: %d%%\n", v);
+    }
+
+    // --- TEMP THRESHOLD  ---
+    else if (message.startsWith("TEMP_1_TH_SET_"))
+    {
+        float v = message.substring(14).toFloat();
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[0].temp_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 1 - SET TEMP THRESHOLD TO: %.1f°C\n", v);
+    }
+    else if (message.startsWith("TEMP_2_TH_SET_"))
+    {
+        float v = message.substring(14).toFloat();
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[1].temp_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 2 - SET TEMP THRESHOLD TO: %.1f°C\n", v);
+    }
+    else if (message.startsWith("TEMP_3_TH_SET_"))
+    {
+        float v = message.substring(14).toFloat();
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            section[2].temp_threshold = v;
+            xSemaphoreGive(xSensor);
+        }
+        Serial.printf("Section 3 - SET TEMP THRESHOLD TO: %.1f°C\n", v);
+    }
+
     // ======== PUMP COMMANDs ========
     // --- SECTION 1 ---
     else if (message == "PUMP_1_ON")

@@ -8,6 +8,8 @@ void task_light(void *pvParamter)
     int filtered[NUM_SECTION] = {0, 0, 0};
     uint32_t last_log_ms[NUM_SECTION] = {0, 0, 0};
 
+    int light_threshold[NUM_SECTION]; 
+
     for (int i = 0; i < NUM_SECTION; i++)
     {
         pinMode(section[i].light_pin, INPUT);
@@ -16,16 +18,25 @@ void task_light(void *pvParamter)
 
     while (1)
     {
+        // ======== Step 0: Update threshold ========
+        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        {
+            for (int i = 0; i < NUM_SECTION; i++)
+            {
+                light_threshold[i] = section[i].light_threshold;
+            }
+            xSemaphoreGive(xSensor);
+        }
 
+        // ======== Step 1: Read all ADC value ========
         for (int i = 0; i < NUM_SECTION; i++)
         {
-            analogRead(section[i].light_pin);   
-            
+            analogRead(section[i].light_pin);
             cur_read[i] = analogRead(section[i].light_pin);
-
             filtered[i] = (filtered[i] * 4 + cur_read[i]) / 5;
         }
 
+        // ======== Step 2: Update global values ========
         if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
         {
             for (int i = 0; i < NUM_SECTION; i++)
@@ -36,19 +47,21 @@ void task_light(void *pvParamter)
             xSemaphoreGive(xSensor);
         }
 
+        // ======== Step 3: Log values ========
         uint32_t now = millis();
         for (int i = 0; i < NUM_SECTION; i++)
         {
             if (now - last_log_ms[i] >= LOG_INTERVAL_MS)
             {
-                Serial.printf("[Light] S%d: raw=%d  light=%d%%\n",
-                              i + 1,
-                              section[i].light_raw,
-                              section[i].light_percent);
+                int cur_percent = 100 - (filtered[i] * 100) / 4095;
+                const char *status = (cur_percent <= light_threshold[i]) ? "DARK" : "BRIGHT";
+
+                Serial.printf("[Light] S%d: raw=%d  light=%d%%  [%s]\n",
+                              i + 1, section[i].light_raw, cur_percent, status);
                 last_log_ms[i] = now;
             }
         }
-        
+
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

@@ -1,21 +1,20 @@
-
 # 🌱 Green Farm BKU - Smart Agriculture IoT Firmware
 
-![ESP32] ![FreeRTOS] ![MQTT] ![C++]
+![ESP32]![FreeRTOS]![MQTT]![C++]
 
 ---
 
 ## 🌟 1. Tính năng cốt lõi (Core Features)
 
-- ⏱️ **FreeRTOS Architecture:** Quản lý đa tác vụ song song (đọc cảm biến, xử lý mạng, điều khiển thiết bị) an toàn với cơ chế `Mutex`, chống deadlock.
+- ⏱️ **FreeRTOS Architecture:** Quản lý đa tác vụ song song (đọc cảm biến, xử lý mạng, điều khiển thiết bị) an toàn với cơ chế `Mutex` (xSensor), chống đụng độ bộ nhớ và deadlock.
 - 🌍 **Giám sát môi trường toàn diện:**
-  - Nhiệt độ & Độ ẩm không khí (DHT22).
+  - Nhiệt độ & Độ ẩm không khí dùng chung (DHT22).
   - Mực nước trong bồn chứa (Ultrasonic HC-SR04).
   - Độ ẩm đất & Cường độ ánh sáng (Phân lập theo 3 khu vực - Sections).
 - ⚙️ **Dual-Mode Control (Tự động & Thủ công):**
   - **Auto Mode:** Tự động điều khiển Bơm, Quạt, Đèn dựa trên Ngưỡng (Threshold) môi trường. Có tích hợp Hysteresis (bù trừ nhiễu) bảo vệ tuổi thọ thiết bị phần cứng.
-  - **Manual Mode:** Người dùng can thiệp trực tiếp trạng thái thiết bị theo thời gian thực.
-- 🎛️ **Dynamic Configuration:** Cho phép cập nhật thông số ngưỡng đất (DRY/WET) trực tiếp từ Web.
+  - **Manual Mode:** Người dùng can thiệp trực tiếp trạng thái thiết bị theo thời gian thực từ xa.
+- 🎛️ **Dynamic Configuration:** Cho phép cập nhật thông số ngưỡng đất (DRY/WET), ngưỡng sáng (LIGHT), và ngưỡng nhiệt (TEMP) riêng biệt cho từng khu vực trực tiếp từ Web.
 
 ---
 
@@ -24,19 +23,21 @@
 Hệ thống được chia làm 2 cấp độ: **Dùng chung toàn vườn (Node-Level)** và **Độc lập theo khu vực (Section-Level)**.
 
 ### 📍 Node-Level (Dùng chung)
-| Thiết bị / Module | Loại tín hiệu | Chân GPIO              | Vai trò |
-| :---              | :--- | :---:  | :---                  
-| **DHT22**         | Digital In    | `4`                    | Đo nhiệt độ & Độ ẩm không khí |
-| **HC-SR04**       | Digital I/O   | Trig: `16` / Echo: `17`| Cảm biến siêu âm đo mực nước  |
+
+| Thiết bị / Module | Loại tín hiệu |        Chân GPIO        | Vai trò                       |
+| :---------------- | :------------ | :---------------------: | :---------------------------- |
+| **DHT22**         | Digital In    |           `4`           | Đo nhiệt độ & Độ ẩm không khí |
+| **HC-SR04**       | Digital I/O   | Trig: `16` / Echo: `17` | Cảm biến siêu âm đo mực nước  |
 
 ### 📍 Section-Level (3 Khu vực độc lập)
-| Tên tín hiệu | Loại tín hiệu | Section 1 | Section 2 | Section 3 |
-| :--- | :--- | :---: | :---: | :---: |
-| **Độ ẩm đất (Soil)** | Analog In (ADC) | `36` | `39` | `34` |
-| **Ánh sáng (Light)** | Analog In (ADC) | `32` | `33` | `35` |
-| **Máy bơm (Pump)** | Digital Out (Relay) | `5` | `18` | `19` |
-| **Quạt (Fan)** | Digital Out (Relay) | `25` | `26` | `27` |
-| **Đèn LED** | PWM Out | `21` | `13` | `14` |
+
+| Tên tín hiệu         | Loại tín hiệu       | Section 1 | Section 2 | Section 3 |
+| :------------------- | :------------------ | :-------: | :-------: | :-------: |
+| **Độ ẩm đất (Soil)** | Analog In (ADC)     |   `36`    |   `39`    |   `34`    |
+| **Ánh sáng (Light)** | Analog In (ADC)     |   `32`    |   `33`    |   `35`    |
+| **Máy bơm (Pump)**   | Digital Out (Relay) |    `5`    |   `18`    |   `19`    |
+| **Quạt (Fan)**       | Digital Out (Relay) |   `25`    |   `26`    |   `27`    |
+| **Đèn LED**          | PWM Out             |   `21`    |   `13`    |   `14`    |
 
 ---
 
@@ -45,17 +46,21 @@ Hệ thống được chia làm 2 cấp độ: **Dùng chung toàn vườn (Node
 Hệ thống giao tiếp hai chiều theo thời gian thực thông qua MQTT Broker.
 
 > **Thông tin kết nối Broker:**
+>
 > - **Host:** `broker.hivemq.com`
 > - **Port (Mạch ESP32):** `1883` (TCP)
 > - **Port (Web Frontend):** `8000` (WebSockets - đường dẫn `/mqtt`)
 
 ### 📤 3.1. Telemetry (ESP32 ➔ Web)
-Gửi dữ liệu môi trường và trạng thái thiết bị lên Dashboard.
+
+Gửi snapshot dữ liệu môi trường và trạng thái thiết bị lên Dashboard.
+
 - **Topic:** `greenframbku/sensors`
 - **Tần suất gửi:** Mỗi 10 giây / lần
 - **Định dạng:** JSON
 
 **Ví dụ Payload:**
+
 ```json
 {
   "air": {
@@ -88,39 +93,53 @@ Gửi dữ liệu môi trường và trạng thái thiết bị lên Dashboard.
 ```
 
 **Từ điển dữ liệu (Data Dictionary):**
-- `air.t` & `air.h`: Nhiệt độ (°C) và Độ ẩm không khí (%) - *(Float)*.
-- `water_lvl`: Mực nước còn lại trong bồn (cm) - *(Float, Max = 10.0)*.
+
+- `air.t` & `air.h`: Nhiệt độ (°C) và Độ ẩm không khí (%) - _(Float)_.
+- `water_lvl`: Mực nước còn lại trong bồn (cm) - _(Float, Max = 10.0)_.
 - `s1, s2, s3`: Dữ liệu độc lập của 3 khu vực canh tác.
-- `soil` & `light`: Độ ẩm đất và Ánh sáng (%) - *(Integer: 0 - 100)*.
-- `pump` & `fan`: Trạng thái Máy bơm, Quạt - *(Integer: 1 = ON, 0 = OFF)*.
-- `led`: Độ sáng đèn chiếu sáng (%) - *(Integer: 0 = OFF, 1-100 = Độ sáng)*.
+- `soil` & `light`: Độ ẩm đất và Ánh sáng (%) - _(Integer: 0 - 100)_.
+- `pump` & `fan`: Trạng thái Máy bơm, Quạt - _(Integer: 1 = ON, 0 = OFF)_.
+- `led`: Độ sáng đèn chiếu sáng (%) - _(Integer: 0 = OFF, 1-100 = Độ sáng)_.
 
 ---
 
 ### 📥 3.2. Commands (Web ➔ ESP32)
+
 Nhận lệnh điều khiển thủ công và cấu hình từ Web.
+
 - **Topic:** `greenframbku/cmd`
 - **Định dạng:** Plain Text String (Chuỗi văn bản thuần)
 
-> ⚠️ **Lưu ý Quan trọng:** > Khi Web gửi lệnh thủ công (ON/OFF/SET), thiết bị tại khu vực đó sẽ **ngay lập tức thoát khỏi chế độ Tự Động (Auto)**. Để mạch tự chạy lại, Web bắt buộc phải gửi lệnh `<DEVICE>_AUTO`.
+> ⚠️ **Lưu ý Quan trọng:** > Khi Web gửi lệnh thủ công (ON/OFF/SET), thiết bị tại khu vực đó sẽ **ngay lập tức thoát khỏi chế độ Tự Động (Auto)**. Để mạch tự chạy lại theo logic, Web bắt buộc phải gửi lệnh `<DEVICE>_AUTO` tương ứng.
 
 #### 🌡️ A. Cấu hình Ngưỡng (Thresholds)
-*Nguyên tắc Logic: Giá trị `WET` phải luôn lớn hơn `DRY`.*
-- **Ngưỡng Đất Khô (DRY - Bật bơm):** `DRY_1_SET_40` *(Cho Section 1)*
-- **Ngưỡng Đất Ướt (WET - Tắt bơm):** `WET_1_SET_70` *(Cho Section 1)*
-*(Thay số `1` thành `2` hoặc `3` cho các khu vực tương ứng).*
+
+Cho phép cài đặt ngưỡng độc lập cho TỪNG KHU VỰC (Thay số `1` thành `2` hoặc `3` cho các khu tương ứng).
+
+- **Độ Ẩm Đất (Soil):** _Nguyên tắc Logic: Giá trị `WET` phải luôn LỚN HƠN `DRY`._
+  - Cài ngưỡng Đất Khô (Bật bơm): `DRY_1_SET_40` _(0-100%)_
+  - Cài ngưỡng Đất Ướt (Tắt bơm): `WET_1_SET_70` _(0-100%)_
+- **Ánh sáng (Light):**
+  - Cài ngưỡng Tối (Bật đèn): `LIGHT_1_TH_SET_30` _(0-100%)_
+- **Nhiệt độ (Temperature):**
+  - Cài ngưỡng Nóng (Bật quạt): `TEMP_1_TH_SET_35.5` _(Kiểu Float - Độ C)_
 
 #### 💧 B. Điều khiển Máy Bơm (Pump)
+
 - **Manual ON/OFF:** `PUMP_1_ON` | `PUMP_1_OFF`
-- **Kích hoạt Auto:** `PUMP_1_AUTO` *(Tự bơm khi đất khô, tự ngắt khi đất ướt)*.
+- **Kích hoạt Auto:** `PUMP_1_AUTO` _(Tự bơm khi đất <= DRY, tự ngắt khi đất >= WET)._
 
 #### 🌬️ C. Điều khiển Quạt (Fan)
+
 - **Manual ON/OFF:** `FAN_1_ON` | `FAN_1_OFF`
-- **Kích hoạt Auto:** `FAN_1_AUTO` *(Tự bật khi nhiệt độ môi trường tăng cao)*.
+- **Kích hoạt Auto:** `FAN_1_AUTO` _(Tự bật khi nhiệt độ môi trường (DHT22) vượt Threshold)._
 
 #### 💡 D. Điều khiển Đèn LED (Dimming 0% - 100%)
-- **Cài đặt độ sáng:** `LIGHT_1_SET_X` *(Với X là % từ 0 đến 100)*.
-  - *Ví dụ Tắt đèn:* `LIGHT_1_SET_0`
-  - *Ví dụ Sáng 50%: * `LIGHT_1_SET_50`
-- **Kích hoạt Auto:** `LIGHT_1_AUTO` *(Tự sáng MAX khi trời tối, tự tắt khi trời sáng)*.
+
+- **Cài đặt độ sáng:** `LIGHT_1_SET_X` _(Với X là % từ 0 đến 100)_.
+  - _Ví dụ Tắt đèn:_ `LIGHT_1_SET_0`
+  - _Ví dụ Sáng 50%: _ `LIGHT_1_SET_50`
+- **Kích hoạt Auto:** `LIGHT_1_AUTO` _(Tự sáng 100% khi trời tối <= Threshold, tự tắt khi trời sáng)._
+
 ```
+
