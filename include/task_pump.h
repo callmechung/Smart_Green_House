@@ -3,6 +3,8 @@
 
 #include "global.h"
 
+bool pump_on(int sec);
+bool pump_off(int sec);
 void task_pump (void *pvParameter);
 
 #endif

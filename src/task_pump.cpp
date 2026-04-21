@@ -1,71 +1,96 @@
 #include "task_pump.h"
 
+static bool is_pump[NUM_SECTION];
+static bool auto_flag[NUM_SECTION];
+static int wet_threshold[NUM_SECTION];
+static int dry_threshold[NUM_SECTION];
+static int cur_soil_val[NUM_SECTION];
+
+bool pump_on(int sec)
+{
+    digitalWrite(section[sec].pump_pin, HIGH);
+    return true;
+}
+
+bool pump_off(int sec)
+{
+    digitalWrite(section[sec].pump_pin, LOW);
+    return false;
+}
+
 void task_pump(void *pvParameter)
 {
-    
-    int local_soil[NUM_SECTION];
-    bool local_auto[NUM_SECTION];
-    int wet_threshold[NUM_SECTION], dry_threshold[NUM_SECTION];
-    bool local_pump_cmd[NUM_SECTION];
-    
 
     for (int i = 0; i < NUM_SECTION; i++)
     {
-        pinMode(section[i].pump_relay_pin, OUTPUT);
-        digitalWrite(section[i].pump_relay_pin, LOW);
-        
+        pinMode(section[i].pump_pin, OUTPUT);
+        digitalWrite(section[i].pump_pin, LOW);
     }
 
     while (1)
     {
-
-        // ======== Update local value =======
-        if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+        if (xSensor != NULL &&
+            xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
         {
             for (int i = 0; i < NUM_SECTION; i++)
             {
-                local_soil[i] = section[i].soil_percent;
-                local_auto[i] = section[i].is_auto_pump;
+                is_pump[i] = section[i].is_pump_on;
+                auto_flag[i] = section[i].is_auto_pump;
                 wet_threshold[i] = section[i].soil_wet_threshold;
                 dry_threshold[i] = section[i].soil_dry_threshold;
-                local_pump_cmd[i] = section[i].is_pump_on; // Lệnh từ Web (nếu đang ở Manual)
+                cur_soil_val[i] = section[i].soil_percent;
             }
+
             xSemaphoreGive(xSensor);
         }
 
-        // ======== Handle Logic ========
         for (int i = 0; i < NUM_SECTION; i++)
         {
-            bool final_state = false;
-            
-            // ----- Auto Mode -----
-            if (local_auto[i] == true)
+            // ===== MANUAL MODE =====
+            if (auto_flag[i] == false)
             {
-                if (local_soil[i] <= dry_threshold[i])
-                    final_state = true;
-                else if (local_soil[i] >= wet_threshold[i])
-                    final_state = false;
-                else 
-                    final_state = local_pump_cmd[i];
-
-                // Only update to server when final != local_pump_cmd
-                if (final_state != local_pump_cmd[i])
+                if (is_pump[i] == true) // => update water tank level later
                 {
-                    if (xSemaphoreTake(xSensor, portMAX_DELAY))
-                    {
-                        section[i].is_pump_on = final_state;
-                        xSemaphoreGive(xSensor);
-                    }
+                    is_pump[i] = pump_on(i);
+                }
+                else
+                {
+                    is_pump[i] = pump_off(i);
+                }
+
+                if (cur_soil_val[i] >= wet_threshold[i])
+                {
+                    is_pump[i] = pump_off(i);
                 }
             }
-            // ----- Manual Mode -----
+
+            // ===== AUTO MODE =====
             else
             {
-                final_state = local_pump_cmd[i];
+                if (cur_soil_val[i] <= dry_threshold[i])
+                {
+                    is_pump[i] = pump_on(i);
+                }
+                else if (cur_soil_val[i] >= wet_threshold[i])
+                {
+                    is_pump[i] = pump_off(i);
+                }
+                else
+                {
+                    // Nằm giữa Dry và Wet -> Giữ trạng thái cũ
+                    if (is_pump[i])
+                        is_pump[i] = pump_on(i);
+                    else
+                        is_pump[i] = pump_off(i);
+                }
             }
 
-            // ----- Hardware action -----
-            digitalWrite(section[i].pump_relay_pin, final_state ? HIGH : LOW);
+            // ===== UPDATE is_pump_on =====
+            if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
+            {
+                section[i].is_pump_on = is_pump[i];
+                xSemaphoreGive(xSensor);
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(500));

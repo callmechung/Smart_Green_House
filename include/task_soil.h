@@ -3,5 +3,7 @@
 
 #include "global.h"
 
+// Nhiệm vụ: Chỉ đọc và cập nhật giá trị => Log value
 void task_soil(void *pvParemeter);
+
 #endif

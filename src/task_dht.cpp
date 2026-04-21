@@ -32,7 +32,7 @@ void task_dht(void *pvParameter)
                 xSemaphoreGive(xSensor);
             }       
             // Log value
-            Serial.printf("[DHT] Temp: %.1f°C  Humid: %.1f%%\n", cur_t, cur_h);
+            //Serial.printf("[DHT] Temp: %.1f°C  Humid: %.1f%%\n", cur_t, cur_h);
         }
         
 

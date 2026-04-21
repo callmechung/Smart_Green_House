@@ -1,79 +1,79 @@
 #include "task_fan.h"
 
+static bool is_on[NUM_SECTION];
+static bool is_auto[NUM_SECTION];
+static float temp_th[NUM_SECTION];  // Thershold riêng cho từng vùng
+static float cur_temp;              // Cả 3 section được đo từ cùng 1 nguồn nhiệt độ
+
 void task_fan(void *pvParameter)
 {
-    float local_air_temp = 0.0;
-    bool local_auto[NUM_SECTION];
-    float local_threshold[NUM_SECTION];
-    bool local_fan_cmd[NUM_SECTION];
-
-    // ======== 1. Cấu hình Pin ban đầu ========
     for (int i = 0; i < NUM_SECTION; i++)
     {
         pinMode(section[i].fan_relay_pin, OUTPUT);
-        digitalWrite(section[i].fan_relay_pin, LOW); // Tắt quạt lúc khởi động
+        digitalWrite(section[i].fan_relay_pin, LOW);
     }
 
     while (1)
     {
-        // ======== 2. Lấy Data từ biến Global ========
         if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
         {
-            local_air_temp = air_temp; // Nhiệt độ dùng chung cho cả 3 khu (từ DHT22)
+            cur_temp = air_temp;
 
             for (int i = 0; i < NUM_SECTION; i++)
             {
-                local_auto[i] = section[i].is_auto_fan;
-                local_threshold[i] = section[i].temp_threshold;
-                local_fan_cmd[i] = section[i].is_fan_on;
+                is_on[i] = section[i].is_fan_on;
+                is_auto[i] = section[i].is_auto_fan;
+                temp_th[i] = section[i].temp_threshold;
             }
+
             xSemaphoreGive(xSensor);
         }
 
-        // ======== 3. Xử lý Logic Auto / Manual ========
         for (int i = 0; i < NUM_SECTION; i++)
         {
-            bool final_fan_state = false;
-
-            if (local_auto[i] == true)
+            // ===== MANUAL MODE ====
+            if (is_auto[i] == false)
             {
-                // ----- CHẾ ĐỘ AUTO -----
-                if (local_air_temp >= local_threshold[i])
+                // --- command ON ---
+                if (is_on[i] == true)
+                    digitalWrite(section[i].fan_relay_pin, HIGH);
+                else
+                    digitalWrite(section[i].fan_relay_pin, LOW);
+            }
+
+            // ===== AUTO MODE =====
+            else
+            {
+                // Khi nhiệt độ hiện tại lớn hơn ngưỡng của vùng
+                if (cur_temp >= temp_th[i])
                 {
-                    final_fan_state = true; // Nóng quá -> Bật quạt
+                    digitalWrite(section[i].fan_relay_pin, HIGH);
+                    is_on[i] = true;
                 }
-                else if (local_air_temp <= local_threshold[i] - 1.0)
+                else if (cur_temp <= (temp_th[i] - 1.0))
                 {
-                    // Mát hơn ngưỡng 1 độ C -> Tắt quạt (Bù trừ nhiễu)
-                    final_fan_state = false;
+                    // Mát hơn ngưỡng ít nhất 1 độ => Tắt quạt
+                    digitalWrite(section[i].fan_relay_pin, LOW);
+                    is_on[i] = false;
                 }
                 else
                 {
-                    // Nằm trong vùng nhiễu thì giữ nguyên trạng thái cũ
-                    final_fan_state = local_fan_cmd[i];
-                }
-
-                // Cập nhật ngược lại trạng thái vào struct để Web hiển thị
-                if (final_fan_state != local_fan_cmd[i])
-                {
-                    if (xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
-                    {
-                        section[i].is_fan_on = final_fan_state;
-                        xSemaphoreGive(xSensor);
-                    }
+                    // Nằm giữa vùng nhiễu (VD: 34.1 đến 34.9) => Giữ nguyên trạng thái cũ
+                    if (is_on[i] == true)
+                        digitalWrite(section[i].fan_relay_pin, HIGH);
+                    else
+                        digitalWrite(section[i].fan_relay_pin, LOW);
                 }
             }
-            else
+
+            if (xSensor != NULL && xSemaphoreTake(xSensor, portMAX_DELAY) == pdPASS)
             {
-                // ----- CHẾ ĐỘ MANUAL -----
-                final_fan_state = local_fan_cmd[i];
+                section[i].is_fan_on = is_on[i];
+                xSemaphoreGive(xSensor);
             }
 
-            // ======== 4. Ra lệnh cho Phần cứng ========
-            digitalWrite(section[i].fan_relay_pin, final_fan_state ? HIGH : LOW);
         }
-
-        // Quét 1 giây 1 lần
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+    
 }

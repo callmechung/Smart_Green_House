@@ -45,10 +45,7 @@
 */
 
 #define TANK_LEVEL     10.0
-#define X_WET          2000
-#define WET            3200
-
-#define SOIL_DRY_VALUE 4095 
+#define SOIL_DRY_VALUE 4095
 #define SOIL_WET_VALUE 1500
 
 struct GARDEN_SECTION
@@ -59,8 +56,8 @@ struct GARDEN_SECTION
   int light_pin;
 
   // OUTPUT PINs
-  int pump_relay_pin;
-  int light_ctrl_pin;
+  int pump_pin;
+  int led_pin;
   int fan_relay_pin;
 
   // Sensor raw data - 12 bits ADC
@@ -70,18 +67,19 @@ struct GARDEN_SECTION
   int soil_percent;   // 0% = VERY DRY | 100% EXTREMELY WET
   int light_percent;  // 0% = DARK     | 100% = BRIGHT
 
-  // Control states
+  // Devices State
   bool is_pump_on;
-  bool is_light_on;
-  int led_brightness;
+  bool is_led_on;
   bool is_fan_on;
 
   // Flag mode
   bool is_auto_pump;
-  bool is_auto_light;
+  bool is_auto_led;
   bool is_auto_fan;
 
-  // Threshold
+  // Threshold & value
+  int led_brightness;
+
   int soil_wet_threshold;   // after conver to percent
   int soil_dry_threshold;   // after conver to percent
   int light_threshold;
@@ -96,9 +94,6 @@ extern float air_temp;
 extern float air_humid;
 extern float water_level; 
 
-extern bool pump_on;
-extern bool led_on;
-extern int led_pwm; // LED brightness value (0-255)
 
 extern SemaphoreHandle_t xSensor;
 extern bool isWifiConnected;

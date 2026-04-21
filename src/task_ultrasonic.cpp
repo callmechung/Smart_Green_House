@@ -32,8 +32,7 @@ void task_ultrasonic(void *pvParemeter)
             xSemaphoreGive(xSensor); // ← trả mutex trước khi print
 
         }
-        //  ======== Step 4: Log value ========
-        Serial.printf("[Ultrasonic] dist=%.1fcm  water=%.1fcm\n", cur_dis, new_level);
+
         
         vTaskDelay(pdMS_TO_TICKS(2000)); // 0.1s
     }

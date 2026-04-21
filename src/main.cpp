@@ -12,6 +12,8 @@
 #include "task_fan.h"
 #include "task_pump.h"
 
+#include "task_monitor.h"
+
 void setup()
 {
   Serial.begin(115200);
@@ -28,6 +30,7 @@ void setup()
   xTaskCreate(task_pump, "TASK PUMP", 2048, NULL, 2, NULL);
   xTaskCreate(task_led, "TASK_LED", 2048, NULL, 2, NULL);
   xTaskCreate(task_fan, "TASK FAN", 2048, NULL, 2, NULL);
+  xTaskCreate(task_monitor, "TASK MONITOR", 4096, NULL, 1, NULL);
 }
 
 void loop() {}
